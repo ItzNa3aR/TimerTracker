@@ -1,0 +1,7 @@
+﻿target/
+release/
+jar_check/
+*.class
+*.rar
+*.zip
+.idea/
