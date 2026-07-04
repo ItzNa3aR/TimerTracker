@@ -1,92 +1,110 @@
 # Time Tracker (Java)
 
-Java-версия того же приложения: следит, сколько времени вы проводите в каждой
-программе, показывает статистику за сегодня / вчера / неделю / месяц / год / всё время.
+A Java desktop app that tracks how much time you spend in each program, and shows
+statistics for today / yesterday / week / month / year / all time.
 
-Данные хранятся **только локально**:
-`C:\Users\<ваше_имя>\TimeTracker\timetracker.db`
-Ничего никуда в сеть не отправляется.
+Data is stored **locally only**:
+`C:\Users\<your_name>\TimeTracker\timetracker.db`
+Nothing is ever sent over the network.
 
-## Как это работает
+## How it works
 
-- `WindowMonitor` — фоновый поток, который раз в секунду через WinAPI (библиотека JNA)
-  узнаёт, какое окно сейчас активно, и какой процесс за ним стоит. Это не зависит от
-  количества мониторов — Windows в любой момент считает активным только одно окно
-  (то, что в фокусе), независимо от того, на каком экране оно находится.
-- При переключении программы предыдущая сессия закрывается и пишется в локальную
-  SQLite-базу (`Database`).
-- `DashboardApp` (JavaFX) читает эту базу и строит статистику по выбранному периоду.
-- `ProcessIconCache` достаёт стандартную иконку Windows у каждой запущенной программы
-  и показывает её в списке вместо цветного кружка.
-- `TrayManager` сворачивает приложение в системный трей вместо полного закрытия.
+- `WindowMonitor` — a background thread that checks, once a second via WinAPI
+  (through the JNA library), which window is currently active and which process
+  owns it. This works regardless of how many monitors you have — Windows always
+  considers exactly one window "active" (the one in focus), no matter which
+  screen it's on.
+- When you switch programs, the previous session is closed and written to the
+  local SQLite database (`Database`).
+- `DashboardApp` (JavaFX) reads that database and builds statistics for the
+  selected period.
+- `ProcessIconCache` fetches the standard Windows icon for each running program
+  and shows it in the list instead of a colored dot.
+- `TrayManager` minimizes the app to the system tray instead of closing it
+  completely.
 
-**Если нажать крестик** — окно спрячется в трей (внизу справа, рядом с часами), а
-служба слежения **продолжит работать** и собирать статистику. Чтобы полностью
-остановить программу — щёлкните правой кнопкой по иконке в трее и выберите
-"Выход (остановить слежение)". Двойной клик по иконке в трее снова открывает окно.
+**Clicking the close button** hides the window to the tray (bottom right, near
+the clock), while the tracking service **keeps running** in the background.
+To fully stop the program, right-click the tray icon and choose
+"Exit (stop tracking)". Double-clicking the tray icon reopens the window.
 
-Периоды: **неделя** — последние 7 дней включая сегодня, **месяц** и **год** — с начала
-текущего календарного месяца/года.
+Periods: **week** — the last 7 days including today; **month** and **year** —
+from the start of the current calendar month/year.
 
-## Что нужно установить один раз
+## One-time setup
 
-1. **JDK 17 или новее** — https://adoptium.net (это даст и `java`, и `jpackage`).
-   При установке отметьте "Add to PATH".
+1. **JDK 17 or newer** — https://adoptium.net (this gives you both `java` and
+   `jpackage`). During installation, check "Add to PATH".
 2. **Maven** — https://maven.apache.org/download.cgi
-   Скачайте архив, распакуйте куда угодно (например `C:\maven`), затем добавьте
-   папку `C:\maven\bin` в переменную PATH (Панель управления → Система →
-   Дополнительные параметры системы → Переменные среды → Path → Изменить → Создать).
+   Download the archive, extract it anywhere (e.g. `C:\maven`), then add the
+   `C:\maven\bin` folder to your PATH environment variable (Control Panel →
+   System → Advanced system settings → Environment Variables → Path → Edit →
+   New).
 
-Проверить, что всё встало, можно командами в cmd:
+Verify everything is installed by running in a terminal:
 ```
 java -version
 mvn -version
 jpackage --version
 ```
 
-## Сборка exe
+## Building the .exe
 
-Просто запустите `build_exe.bat` (лучше через `cmd`, а не двойным кликом — так
-консоль не закроется сама, если что-то пойдёт не так). Скрипт:
+1. Build the fat jar (with all dependencies bundled):
+```
+mvn clean package
+```
+This produces `target\time-tracker-1.0.0.jar`.
 
-1. Проверяет, что Java, Maven и jpackage установлены.
-2. Собирает один jar со всеми зависимостями внутри.
-3. Собирает `dist\TimeTracker\TimeTracker.exe` через `jpackage`, с полностью
-   встроенной Java — на компьютере, где вы будете запускать exe, Java не нужна.
+2. Package it into a standalone Windows app with `jpackage` (Java is fully
+   bundled — the machine running the .exe does **not** need Java installed):
+```
+jpackage --input target --name TimeTracker --main-jar time-tracker-1.0.0.jar --main-class com.timetracker.Main --type app-image --icon assets\icon.ico --dest release
+```
 
-Весь подробный лог всегда пишется в `build_log.txt` рядом со скриптом — если
-что-то не получилось, откройте этот файл или пришлите его текст.
+This creates `release\TimeTracker\TimeTracker.exe`.
 
-По умолчанию exe запускается с видимой консольной, чтобы вы сразу видели ошибки,
-если приложение упадёт при старте. Когда убедитесь, что всё работает, откройте
-`build_exe.bat`, уберите флаг `--win-console` из команды `jpackage` и пересоберите —
-получите чистую версию без чёрного окна.
+> **Tip:** if the app fails to start and the window just doesn't appear, add
+> `--win-console` to the command above to get a console window with the full
+> error/stack trace. Once everything works, rebuild **without** that flag to
+> get the clean version with no black window.
 
-## Запуск без сборки exe (для разработки)
+## Running without building an exe (for development)
 
 ```
 mvn clean javafx:run
 ```
-(для этого нужен плагин javafx-maven-plugin — можно добавить в pom.xml при желании,
-либо просто собрать jar и запустить `java -jar target\time-tracker-1.0.0.jar`).
+(this requires the `javafx-maven-plugin` in `pom.xml`), or simply build the jar
+and run it directly:
+```
+java -jar target\time-tracker-1.0.0.jar
+```
 
-## Автозапуск при старте Windows (по желанию)
+## Auto-start on Windows boot (optional)
 
 1. `Win + R` → `shell:startup` → Enter.
-2. Скопируйте туда ярлык на `dist\TimeTracker\TimeTracker.exe`.
+2. Copy a shortcut to `release\TimeTracker\TimeTracker.exe` into that folder.
 
-## Структура проекта
+Alternatively, the app can register itself in
+`HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` on first launch and start
+automatically (hidden, minimized to tray) on the next reboot — see
+`enableAutoStart()` in `DashboardApp.java`.
+
+## Project structure
 
 ```
 TimeTrackerJava/
 ├── pom.xml
-├── build_exe.bat
+├── assets/
+│   └── icon.ico
 ├── src/main/java/com/timetracker/
 │   ├── Main.java
 │   ├── gui/
-│   │   └── DashboardApp.java   # окно приложения (JavaFX)
+│   │   ├── DashboardApp.java     # application window (JavaFX)
+│   │   ├── TrayManager.java      # system tray integration
+│   │   └── ProcessIconCache.java # per-process icon lookup
 │   └── tracker/
-│       ├── Database.java       # локальная SQLite база
-│       ├── WindowMonitor.java  # фоновая служба слежения за активным окном
-│       └── Period.java         # расчёт диапазонов дат
+│       ├── Database.java         # local SQLite database
+│       ├── WindowMonitor.java    # background active-window tracking service
+│       └── Period.java           # date range calculations
 ```
